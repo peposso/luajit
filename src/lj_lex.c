@@ -27,8 +27,8 @@
 
 /* Lua lexer token names. */
 static const char *const tokennames[] = {
-#define TKSTR1(name)		#name,
-#define TKSTR2(name, sym)	#sym,
+#define TKSTR1(name)                #name,
+#define TKSTR2(name, sym)        #sym,
 TKDEF(TKSTR1, TKSTR2)
 #undef TKSTR1
 #undef TKSTR2
@@ -37,12 +37,12 @@ TKDEF(TKSTR1, TKSTR2)
 
 /* -- Buffer handling ----------------------------------------------------- */
 
-#define char2int(c)		((int)(uint8_t)(c))
+#define char2int(c)                ((int)(uint8_t)(c))
 #define next(ls) \
   (ls->current = (ls->n--) > 0 ? char2int(*ls->p++) : fillbuf(ls))
-#define save_and_next(ls)	(save(ls, ls->current), next(ls))
-#define currIsNewline(ls)	(ls->current == '\n' || ls->current == '\r')
-#define END_OF_STREAM		(-1)
+#define save_and_next(ls)        (save(ls, ls->current), next(ls))
+#define currIsNewline(ls)        (ls->current == '\n' || ls->current == '\r')
+#define END_OF_STREAM                (-1)
 
 static int fillbuf(LexState *ls)
 {
@@ -96,14 +96,14 @@ static void lex_number(LexState *ls, TValue *tv)
     if ((ls->current | 0x20) == 'x') xp = 'p';
   }
   while (lj_char_isident(ls->current) || ls->current == '.' ||
-	 ((ls->current == '-' || ls->current == '+') && (c | 0x20) == xp)) {
+         ((ls->current == '-' || ls->current == '+') && (c | 0x20) == xp)) {
     c = ls->current;
     save_and_next(ls);
   }
   save(ls, '\0');
   fmt = lj_strscan_scan((const uint8_t *)ls->sb.buf, tv,
-	  (LJ_DUALNUM ? STRSCAN_OPT_TOINT : STRSCAN_OPT_TONUM) |
-	  (LJ_HASFFI ? (STRSCAN_OPT_LL|STRSCAN_OPT_IMAG) : 0));
+          (LJ_DUALNUM ? STRSCAN_OPT_TOINT : STRSCAN_OPT_TONUM) |
+          (LJ_HASFFI ? (STRSCAN_OPT_LL|STRSCAN_OPT_IMAG) : 0));
   if (LJ_DUALNUM && fmt == STRSCAN_INT) {
     setitype(tv, LJ_TISNUM);
   } else if (fmt == STRSCAN_NUM) {
@@ -159,8 +159,8 @@ static void read_long_string(LexState *ls, TValue *tv, int sep)
       break;
     case ']':
       if (skip_sep(ls) == sep) {
-	save_and_next(ls);  /* skip 2nd `]' */
-	goto endloop;
+        save_and_next(ls);  /* skip 2nd `]' */
+        goto endloop;
       }
       break;
     case '\n':
@@ -177,7 +177,7 @@ static void read_long_string(LexState *ls, TValue *tv, int sep)
   } endloop:
   if (tv) {
     GCstr *str = lj_parse_keepstr(ls, ls->sb.buf + (2 + (MSize)sep),
-				      ls->sb.n - 2*(2 + (MSize)sep));
+                                      ls->sb.n - 2*(2 + (MSize)sep));
     setstrV(ls->L, tv, str);
   }
 }
@@ -205,42 +205,42 @@ static void read_string(LexState *ls, int delim, TValue *tv)
       case 't': c = '\t'; break;
       case 'v': c = '\v'; break;
       case 'x':  /* Hexadecimal escape '\xXX'. */
-	c = (next(ls) & 15u) << 4;
-	if (!lj_char_isdigit(ls->current)) {
-	  if (!lj_char_isxdigit(ls->current)) goto err_xesc;
-	  c += 9 << 4;
-	}
-	c += (next(ls) & 15u);
-	if (!lj_char_isdigit(ls->current)) {
-	  if (!lj_char_isxdigit(ls->current)) goto err_xesc;
-	  c += 9;
-	}
-	break;
+        c = (next(ls) & 15u) << 4;
+        if (!lj_char_isdigit(ls->current)) {
+          if (!lj_char_isxdigit(ls->current)) goto err_xesc;
+          c += 9 << 4;
+        }
+        c += (next(ls) & 15u);
+        if (!lj_char_isdigit(ls->current)) {
+          if (!lj_char_isxdigit(ls->current)) goto err_xesc;
+          c += 9;
+        }
+        break;
       case 'z':  /* Skip whitespace. */
-	next(ls);
-	while (lj_char_isspace(ls->current))
-	  if (currIsNewline(ls)) inclinenumber(ls); else next(ls);
-	continue;
+        next(ls);
+        while (lj_char_isspace(ls->current))
+          if (currIsNewline(ls)) inclinenumber(ls); else next(ls);
+        continue;
       case '\n': case '\r': save(ls, '\n'); inclinenumber(ls); continue;
       case '\\': case '\"': case '\'': break;
       case END_OF_STREAM: continue;
       default:
-	if (!lj_char_isdigit(c))
-	  goto err_xesc;
-	c -= '0';  /* Decimal escape '\ddd'. */
-	if (lj_char_isdigit(next(ls))) {
-	  c = c*10 + (ls->current - '0');
-	  if (lj_char_isdigit(next(ls))) {
-	    c = c*10 + (ls->current - '0');
-	    if (c > 255) {
-	    err_xesc:
-	      lj_lex_error(ls, TK_string, LJ_ERR_XESC);
-	    }
-	    next(ls);
-	  }
-	}
-	save(ls, c);
-	continue;
+        if (!lj_char_isdigit(c))
+          goto err_xesc;
+        c -= '0';  /* Decimal escape '\ddd'. */
+        if (lj_char_isdigit(next(ls))) {
+          c = c*10 + (ls->current - '0');
+          if (lj_char_isdigit(next(ls))) {
+            c = c*10 + (ls->current - '0');
+            if (c > 255) {
+            err_xesc:
+              lj_lex_error(ls, TK_string, LJ_ERR_XESC);
+            }
+            next(ls);
+          }
+        }
+        save(ls, c);
+        continue;
       }
       save(ls, c);
       next(ls);
@@ -264,17 +264,17 @@ static int llex(LexState *ls, TValue *tv)
     if (lj_char_isident(ls->current)) {
       GCstr *s;
       if (lj_char_isdigit(ls->current)) {  /* Numeric literal. */
-	lex_number(ls, tv);
-	return TK_number;
+        lex_number(ls, tv);
+        return TK_number;
       }
       /* Identifier or reserved word. */
       do {
-	save_and_next(ls);
+        save_and_next(ls);
       } while (lj_char_isident(ls->current));
       s = lj_parse_keepstr(ls, ls->sb.buf, ls->sb.n);
       setstrV(ls->L, tv, s);
       if (s->reserved > 0)  /* Reserved word? */
-	return TK_OFS + s->reserved;
+        return TK_OFS + s->reserved;
       return TK_name;
     }
     switch (ls->current) {
@@ -294,28 +294,28 @@ static int llex(LexState *ls, TValue *tv)
       /* else is a comment */
       next(ls);
       if (ls->current == '[') {
-	int sep = skip_sep(ls);
-	lj_str_resetbuf(&ls->sb);  /* `skip_sep' may dirty the buffer */
-	if (sep >= 0) {
-	  read_long_string(ls, NULL, sep);  /* long comment */
-	  lj_str_resetbuf(&ls->sb);
-	  continue;
-	}
+        int sep = skip_sep(ls);
+        lj_str_resetbuf(&ls->sb);  /* `skip_sep' may dirty the buffer */
+        if (sep >= 0) {
+          read_long_string(ls, NULL, sep);  /* long comment */
+          lj_str_resetbuf(&ls->sb);
+          continue;
+        }
       }
       /* else short comment */
       while (!currIsNewline(ls) && ls->current != END_OF_STREAM)
-	next(ls);
+        next(ls);
       continue;
     case '[': {
       int sep = skip_sep(ls);
       if (sep >= 0) {
-	read_long_string(ls, tv, sep);
-	return TK_string;
+        read_long_string(ls, tv, sep);
+        return TK_string;
       } else if (sep == -1) {
-	return '[';
+        return '[';
       } else {
-	lj_lex_error(ls, TK_string, LJ_ERR_XLDELIM);
-	continue;
+        lj_lex_error(ls, TK_string, LJ_ERR_XLDELIM);
+        continue;
       }
       }
     case '=':
@@ -340,17 +340,17 @@ static int llex(LexState *ls, TValue *tv)
     case '.':
       save_and_next(ls);
       if (ls->current == '.') {
-	next(ls);
-	if (ls->current == '.') {
-	  next(ls);
-	  return TK_dots;   /* ... */
-	}
-	return TK_concat;   /* .. */
+        next(ls);
+        if (ls->current == '.') {
+          next(ls);
+          return TK_dots;   /* ... */
+        }
+        return TK_concat;   /* .. */
       } else if (!lj_char_isdigit(ls->current)) {
-	return '.';
+        return '.';
       } else {
-	lex_number(ls, tv);
-	return TK_number;
+        lex_number(ls, tv);
+        return TK_number;
       }
     case END_OF_STREAM:
       return TK_eof;
