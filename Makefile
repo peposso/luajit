@@ -146,6 +146,10 @@ amalg:
 clean:
 	$(MAKE) -C src clean
 
-.PHONY: all install amalg clean
+test:
+	$(INSTALL_DEP) test/def.lua
+	$(INSTALL_DEP) test/elif.lua
+
+.PHONY: all install amalg clean test
 
 ##############################################################################

@@ -273,8 +273,12 @@ static int llex(LexState *ls, TValue *tv)
       } while (lj_char_isident(ls->current));
       s = lj_parse_keepstr(ls, ls->sb.buf, ls->sb.n);
       setstrV(ls->L, tv, s);
-      if (s->reserved > 0)  /* Reserved word? */
-        return TK_OFS + s->reserved;
+      if (s->reserved > 0) { /* Reserved word? */
+        int tk = TK_OFS + s->reserved;
+        if (tk == TK_def) return TK_function;
+        if (tk == TK_elif) return TK_elseif;
+        return tk;
+      }
       return TK_name;
     }
     switch (ls->current) {
