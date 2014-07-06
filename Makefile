@@ -147,6 +147,7 @@ clean:
 	$(MAKE) -C src clean
 
 test:
+	$(INSTALL_DEP) test/indent_for.lua
 	$(INSTALL_DEP) test/indent_while.lua
 	$(INSTALL_DEP) test/def.lua
 	$(INSTALL_DEP) test/elif.lua

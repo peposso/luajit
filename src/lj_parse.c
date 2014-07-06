@@ -2468,14 +2468,14 @@ static void parse_while(LexState *ls, BCLine line)
   loop = bcemit_AD(fs, BC_LOOP, fs->nactvar, 0);
   if (ls->token == TK_indentblock) {
     lj_lex_next(ls);
-    if (parse_indent_block(ls, i)) lex_match(ls, TK_end, TK_while, line);
-    jmp_patch(fs, bcemit_jmp(fs), start);
+    if (parse_indent_block(ls, i))
+      lex_match(ls, TK_end, TK_while, line);
   } else {
     lex_check(ls, TK_do);
     parse_block(ls);
     lex_match(ls, TK_end, TK_while, line);
-    jmp_patch(fs, bcemit_jmp(fs), start);
   }
+  jmp_patch(fs, bcemit_jmp(fs), start);
   fscope_end(fs);
   jmp_tohere(fs, condexit);
   jmp_patchins(fs, loop, fs->pc);
@@ -2509,7 +2509,7 @@ static void parse_repeat(LexState *ls, BCLine line)
 }
 
 /* Parse numeric 'for'. */
-static void parse_for_num(LexState *ls, GCstr *varname, BCLine line)
+static void parse_for_num(LexState *ls, GCstr *varname, BCLine line, int indent)
 {
   FuncState *fs = ls->fs;
   BCReg base = fs->freereg;
@@ -2532,12 +2532,19 @@ static void parse_for_num(LexState *ls, GCstr *varname, BCLine line)
     bcreg_reserve(fs, 1);
   }
   var_add(ls, 3);  /* Hidden control variables. */
-  lex_check(ls, TK_do);
   loop = bcemit_AJ(fs, BC_FORI, base, NO_JMP);
   fscope_begin(fs, &bl, 0);  /* Scope for visible variables. */
   var_add(ls, 1);
   bcreg_reserve(fs, 1);
-  parse_block(ls);
+  if (ls->token == TK_indentblock) {
+    lj_lex_next(ls);
+    if (parse_indent_block(ls, indent))
+      lex_match(ls, TK_end, TK_for, line);
+  } else {
+    lex_check(ls, TK_do);
+    parse_block(ls);
+    lex_match(ls, TK_end, TK_for, line);
+  }
   fscope_end(fs);
   /* Perform loop inversion. Loop control instructions are at the end. */
   loopend = bcemit_AJ(fs, BC_FORL, base, NO_JMP);
@@ -2579,7 +2586,7 @@ static int predict_next(LexState *ls, FuncState *fs, BCPos pc)
 }
 
 /* Parse 'for' iterator. */
-static void parse_for_iter(LexState *ls, GCstr *indexname)
+static void parse_for_iter(LexState *ls, GCstr *indexname, int indent)
 {
   FuncState *fs = ls->fs;
   ExpDesc e;
@@ -2603,12 +2610,19 @@ static void parse_for_iter(LexState *ls, GCstr *indexname)
   bcreg_bump(fs, 3);  /* The iterator needs another 3 slots (func + 2 args). */
   isnext = (nvars <= 5 && predict_next(ls, fs, exprpc));
   var_add(ls, 3);  /* Hidden control variables. */
-  lex_check(ls, TK_do);
   loop = bcemit_AJ(fs, isnext ? BC_ISNEXT : BC_JMP, base, NO_JMP);
   fscope_begin(fs, &bl, 0);  /* Scope for visible variables. */
   var_add(ls, nvars-3);
   bcreg_reserve(fs, nvars-3);
-  parse_block(ls);
+  if (ls->token == TK_indentblock) {
+    lj_lex_next(ls);
+    if (parse_indent_block(ls, indent))
+      lex_match(ls, TK_end, TK_for, line);
+  } else {
+    lex_check(ls, TK_do);
+    parse_block(ls);
+    lex_match(ls, TK_end, TK_for, line);
+  }
   fscope_end(fs);
   /* Perform loop inversion. Loop control instructions are at the end. */
   jmp_patchins(fs, loop, fs->pc);
@@ -2626,15 +2640,15 @@ static void parse_for(LexState *ls, BCLine line)
   GCstr *varname;
   FuncScope bl;
   fscope_begin(fs, &bl, FSCOPE_LOOP);
+  int i = ls->indent;
   lj_lex_next(ls);  /* Skip 'for'. */
   varname = lex_str(ls);  /* Get first variable name. */
   if (ls->token == '=')
-    parse_for_num(ls, varname, line);
+    parse_for_num(ls, varname, line, i);
   else if (ls->token == ',' || ls->token == TK_in)
-    parse_for_iter(ls, varname);
+    parse_for_iter(ls, varname, i);
   else
     err_syntax(ls, LJ_ERR_XFOR);
-  lex_match(ls, TK_end, TK_for, line);
   fscope_end(fs);  /* Resolve break list. */
 }
 
