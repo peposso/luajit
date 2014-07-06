@@ -2432,7 +2432,7 @@ static void parse_block(LexState *ls)
 
 #include <stdio.h>
 
-/* Parse a block. */
+/* Parse a indent block. */
 static int parse_indent_block(LexState *ls, int indent)
 {
   FuncState *fs = ls->fs;
@@ -2454,6 +2454,27 @@ static int parse_indent_block(LexState *ls, int indent)
   return islast;
 }
 
+/* Parse a single block. */
+static int parse_single_block(LexState *ls)
+{
+  int line = ls->linenumber;
+  FuncState *fs = ls->fs;
+  FuncScope bl;
+  fscope_begin(fs, &bl, 0);
+  int islast = 0;
+  synlevel_begin(ls);
+  while ((!islast && !endofblock(ls->token)) && ls->linenumber == line) {
+    islast = parse_stmt(ls);
+    lex_opt(ls, ';');
+    lua_assert(ls->fs->framesize >= ls->fs->freereg &&
+         ls->fs->freereg >= ls->fs->nactvar);
+    ls->fs->freereg = ls->fs->nactvar;  /* Free registers after each stmt. */
+  }
+  synlevel_end(ls);
+  fscope_end(fs);
+  return islast;
+}
+
 /* Parse 'while' statement. */
 static void parse_while(LexState *ls, BCLine line)
 {
@@ -2470,6 +2491,9 @@ static void parse_while(LexState *ls, BCLine line)
     lj_lex_next(ls);
     if (parse_indent_block(ls, i))
       lex_match(ls, TK_end, TK_while, line);
+  } else if (ls->token == ';') {
+    lj_lex_next(ls);
+    parse_single_block(ls);
   } else {
     lex_check(ls, TK_do);
     parse_block(ls);
@@ -2540,6 +2564,9 @@ static void parse_for_num(LexState *ls, GCstr *varname, BCLine line, int indent)
     lj_lex_next(ls);
     if (parse_indent_block(ls, indent))
       lex_match(ls, TK_end, TK_for, line);
+  } else if (ls->token == ';') {
+    lj_lex_next(ls);
+    parse_single_block(ls);
   } else {
     lex_check(ls, TK_do);
     parse_block(ls);
@@ -2618,7 +2645,10 @@ static void parse_for_iter(LexState *ls, GCstr *indexname, int indent)
     lj_lex_next(ls);
     if (parse_indent_block(ls, indent))
       lex_match(ls, TK_end, TK_for, line);
-  } else {
+   } else if (ls->token == ';') {
+    lj_lex_next(ls);
+    parse_single_block(ls);
+ } else {
     lex_check(ls, TK_do);
     parse_block(ls);
     lex_match(ls, TK_end, TK_for, line);

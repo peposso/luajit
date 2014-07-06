@@ -103,6 +103,7 @@ default all $(INSTALL_DEP):
 	@echo "==== Building LuaJIT $(VERSION) ===="
 	$(MAKE) -C src
 	@echo "==== Successfully built LuaJIT $(VERSION) ===="
+	make test
 
 install: $(INSTALL_DEP)
 	@echo "==== Installing LuaJIT $(VERSION) to $(PREFIX) ===="
