@@ -261,6 +261,26 @@ static int llex(LexState *ls, TValue *tv)
 {
   lj_str_resetbuf(&ls->sb);
   for (;;) {
+    if (ls->indent == -1) {
+      ls->indent = 0;
+      for (;;) {
+        switch (ls->current) {
+        case '\n':
+        case '\r':
+          inclinenumber(ls);
+          ls->indent = 0;
+          continue;
+        case ' ':
+        case '\t':
+        case '\v':
+        case '\f':
+          next(ls);
+          ls->indent += 1;
+          continue;
+        }
+        break;
+      }
+    }
     if (lj_char_isident(ls->current)) {
       GCstr *s;
       if (lj_char_isdigit(ls->current)) {  /* Numeric literal. */
@@ -285,6 +305,7 @@ static int llex(LexState *ls, TValue *tv)
     case '\n':
     case '\r':
       inclinenumber(ls);
+      ls->indent = -1;
       continue;
     case ' ':
     case '\t':
@@ -309,6 +330,7 @@ static int llex(LexState *ls, TValue *tv)
       /* else short comment */
       while (!currIsNewline(ls) && ls->current != END_OF_STREAM)
         next(ls);
+      ls->indent = -1;
       continue;
     case '[': {
       int sep = skip_sep(ls);
@@ -336,7 +358,45 @@ static int llex(LexState *ls, TValue *tv)
       if (ls->current != '=') return '~'; else { next(ls); return TK_ne; }
     case ':':
       next(ls);
-      if (ls->current != ':') return ':'; else { next(ls); return TK_label; }
+      //if (ls->current != ':') return ':'; else { next(ls); return TK_label; }
+      if (ls->current == ':') {
+        next(ls); return TK_label;
+      }
+      for (;;) {
+        switch (ls->current) {
+        case ' ':
+        case '\t':
+        case '\v':
+        case '\f':
+          next(ls);
+          continue;
+        case '-':
+          next(ls);
+          if (ls->current != '-') {
+            lj_lex_error(ls, ':', LJ_ERR_XLDELIM);
+          }
+          /* else is a comment */
+          next(ls);
+          if (ls->current == '[') {
+            int sep = skip_sep(ls);
+            lj_str_resetbuf(&ls->sb);  /* `skip_sep' may dirty the buffer */
+            if (sep >= 0) {
+              read_long_string(ls, NULL, sep);  /* long comment */
+              lj_str_resetbuf(&ls->sb);
+              continue;
+            }
+          }
+          /* else short comment */
+          while (!currIsNewline(ls) && ls->current != END_OF_STREAM);
+        }
+        break;
+      }
+      if (ls->current == '\n' || ls->current == '\r') {
+        next(ls);
+        ls->indent = -1;
+        return TK_indentblock;
+      }
+      return ':';
     case '"':
     case '\'':
       read_string(ls, ls->current, tv);
@@ -385,6 +445,7 @@ int lj_lex_setup(lua_State *L, LexState *ls)
   ls->lookahead = TK_eof;  /* No look-ahead token. */
   ls->linenumber = 1;
   ls->lastline = 1;
+  ls->indent = -1;
   lj_str_resizebuf(ls->L, &ls->sb, LJ_MIN_SBUF);
   next(ls);  /* Read-ahead first char. */
   if (ls->current == 0xef && ls->n >= 2 && char2int(ls->p[0]) == 0xbb &&

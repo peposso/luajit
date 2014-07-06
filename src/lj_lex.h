@@ -19,7 +19,9 @@
   _(def) _(elif) \
   _(while) \
   __(concat, ..) __(dots, ...) __(eq, ==) __(ge, >=) __(le, <=) __(ne, ~=) \
-  __(label, ::) __(number, <number>) __(name, <name>) __(string, <string>) \
+  __(label, ::) \
+  __(indentblock, :<nl>) \
+  __(number, <number>) __(name, <name>) __(string, <string>) \
   __(eof, <eof>)
 
 enum {
@@ -74,6 +76,7 @@ typedef struct LexState {
   BCInsLine *bcstack;	/* Stack for bytecode instructions/line numbers. */
   MSize sizebcstack;	/* Size of bytecode stack. */
   uint32_t level;	/* Syntactical nesting level. */
+  int indent; /* indention space count */
 } LexState;
 
 LJ_FUNC int lj_lex_setup(lua_State *L, LexState *ls);

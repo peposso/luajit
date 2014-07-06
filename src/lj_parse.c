@@ -551,6 +551,7 @@ noins:
 
 /* Forward declaration. */
 static BCPos bcemit_jmp(FuncState *fs);
+static int parse_stmt(LexState *ls);
 
 /* Discharge an expression to a specific register. */
 static void expr_toreg(FuncState *fs, ExpDesc *e, BCReg reg)
@@ -2429,21 +2430,52 @@ static void parse_block(LexState *ls)
   fscope_end(fs);
 }
 
+#include <stdio.h>
+
+/* Parse a block. */
+static int parse_indent_block(LexState *ls, int indent)
+{
+  FuncState *fs = ls->fs;
+  FuncScope bl;
+  fscope_begin(fs, &bl, 0);
+  int islast = 0;
+  synlevel_begin(ls);
+  while ((!islast && !endofblock(ls->token)) && ls->indent > indent) {
+    islast = parse_stmt(ls);
+    lex_opt(ls, ';');
+    lua_assert(ls->fs->framesize >= ls->fs->freereg &&
+         ls->fs->freereg >= ls->fs->nactvar);
+    ls->fs->freereg = ls->fs->nactvar;  /* Free registers after each stmt. */
+  }
+  if (ls->indent > indent)
+    islast = islast || endofblock(ls->token);
+  synlevel_end(ls);
+  fscope_end(fs);
+  return islast;
+}
+
 /* Parse 'while' statement. */
 static void parse_while(LexState *ls, BCLine line)
 {
   FuncState *fs = ls->fs;
   BCPos start, loop, condexit;
   FuncScope bl;
+  int i = ls->indent;
   lj_lex_next(ls);  /* Skip 'while'. */
   start = fs->lasttarget = fs->pc;
   condexit = expr_cond(ls);
   fscope_begin(fs, &bl, FSCOPE_LOOP);
-  lex_check(ls, TK_do);
   loop = bcemit_AD(fs, BC_LOOP, fs->nactvar, 0);
-  parse_block(ls);
-  jmp_patch(fs, bcemit_jmp(fs), start);
-  lex_match(ls, TK_end, TK_while, line);
+  if (ls->token == TK_indentblock) {
+    lj_lex_next(ls);
+    if (parse_indent_block(ls, i)) lex_match(ls, TK_end, TK_while, line);
+    jmp_patch(fs, bcemit_jmp(fs), start);
+  } else {
+    lex_check(ls, TK_do);
+    parse_block(ls);
+    lex_match(ls, TK_end, TK_while, line);
+    jmp_patch(fs, bcemit_jmp(fs), start);
+  }
   fscope_end(fs);
   jmp_tohere(fs, condexit);
   jmp_patchins(fs, loop, fs->pc);
@@ -2709,7 +2741,7 @@ static void parse_chunk(LexState *ls)
     islast = parse_stmt(ls);
     lex_opt(ls, ';');
     lua_assert(ls->fs->framesize >= ls->fs->freereg &&
-	       ls->fs->freereg >= ls->fs->nactvar);
+         ls->fs->freereg >= ls->fs->nactvar);
     ls->fs->freereg = ls->fs->nactvar;  /* Free registers after each stmt. */
   }
   synlevel_end(ls);
