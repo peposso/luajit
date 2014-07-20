@@ -2448,7 +2448,7 @@ static int parse_indent_block(LexState *ls, int indent)
     ls->fs->freereg = ls->fs->nactvar;  /* Free registers after each stmt. */
   }
   if (ls->indent > indent)
-    islast = islast || endofblock(ls->token);
+    islast = 1;
   synlevel_end(ls);
   fscope_end(fs);
   return islast;
@@ -2470,6 +2470,8 @@ static int parse_single_block(LexState *ls)
          ls->fs->freereg >= ls->fs->nactvar);
     ls->fs->freereg = ls->fs->nactvar;  /* Free registers after each stmt. */
   }
+  if (ls->linenumber == line)
+    islast = 1;
   synlevel_end(ls);
   fscope_end(fs);
   return islast;
@@ -2493,7 +2495,8 @@ static void parse_while(LexState *ls, BCLine line)
       lex_match(ls, TK_end, TK_while, line);
   } else if (ls->token == ';') {
     lj_lex_next(ls);
-    parse_single_block(ls);
+    if (parse_single_block(ls))
+      lex_match(ls, TK_end, TK_while, line);
   } else {
     lex_check(ls, TK_do);
     parse_block(ls);
@@ -2566,7 +2569,8 @@ static void parse_for_num(LexState *ls, GCstr *varname, BCLine line, int indent)
       lex_match(ls, TK_end, TK_for, line);
   } else if (ls->token == ';') {
     lj_lex_next(ls);
-    parse_single_block(ls);
+    if (parse_single_block(ls))
+      lex_match(ls, TK_end, TK_for, line);
   } else {
     lex_check(ls, TK_do);
     parse_block(ls);
@@ -2647,7 +2651,8 @@ static void parse_for_iter(LexState *ls, GCstr *indexname, int indent)
       lex_match(ls, TK_end, TK_for, line);
   } else if (ls->token == ';') {
     lj_lex_next(ls);
-    parse_single_block(ls);
+    if (parse_single_block(ls))
+      lex_match(ls, TK_end, TK_for, line);
   } else {
     lex_check(ls, TK_do);
     parse_block(ls);
@@ -2683,13 +2688,25 @@ static void parse_for(LexState *ls, BCLine line)
 }
 
 /* Parse condition and 'then' block. */
-static BCPos parse_then(LexState *ls)
+static BCPos parse_then(LexState *ls, int *isindent)
 {
   BCPos condexit;
+  int indent =ls->indent;
   lj_lex_next(ls);  /* Skip 'if' or 'elseif'. */
   condexit = expr_cond(ls);
-  lex_check(ls, TK_then);
-  parse_block(ls);
+  *isindent = 0;
+  if (ls->token == TK_indentblock) {
+    lj_lex_next(ls);
+    if (!parse_indent_block(ls, indent))
+      *isindent = 1;
+  } else if (ls->token == ';') {
+    lj_lex_next(ls);
+    if(!parse_single_block(ls))
+      *isindent = 1;
+  } else {
+    lex_check(ls, TK_then);
+    parse_block(ls);
+  }
   return condexit;
 }
 
@@ -2699,22 +2716,40 @@ static void parse_if(LexState *ls, BCLine line)
   FuncState *fs = ls->fs;
   BCPos flist;
   BCPos escapelist = NO_JMP;
-  flist = parse_then(ls);
-  while (ls->token == TK_elseif) {  /* Parse multiple 'elseif' blocks. */
+  int indent = ls->indent;
+  int isindent = 0;
+  int isnext = 0;
+  flist = parse_then(ls, &isindent);
+  isnext = (!isindent || indent == ls->indent)? 1: 0;
+  while (isnext && ls->token == TK_elseif) {  /* Parse multiple 'elseif' blocks. */
     jmp_append(fs, &escapelist, bcemit_jmp(fs));
     jmp_tohere(fs, flist);
-    flist = parse_then(ls);
+    flist = parse_then(ls, &isindent);
+    isnext = (!isindent || indent == ls->indent)? 1: 0;
   }
-  if (ls->token == TK_else) {  /* Parse optional 'else' block. */
+  if (isnext && ls->token == TK_else) {  /* Parse optional 'else' block. */
     jmp_append(fs, &escapelist, bcemit_jmp(fs));
     jmp_tohere(fs, flist);
+    indent = ls->indent;
     lj_lex_next(ls);  /* Skip 'else'. */
-    parse_block(ls);
+    isindent = 0;
+    if (ls->token == TK_indentblock) {
+      lj_lex_next(ls);  /* Skip ':'. */
+      if (!parse_indent_block(ls, indent))
+        isindent = 1;
+    } else if (ls->token == ';') {
+      lj_lex_next(ls);  /* Skip ';'. */
+      if (!parse_single_block(ls))
+        isindent = 1;
+    } else {
+      parse_block(ls);
+    }
   } else {
     jmp_append(fs, &escapelist, flist);
   }
   jmp_tohere(fs, escapelist);
-  lex_match(ls, TK_end, TK_if, line);
+  if (isindent == 0)
+    lex_match(ls, TK_end, TK_if, line);
 }
 
 /* -- Parse statements ---------------------------------------------------- */

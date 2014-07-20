@@ -387,7 +387,8 @@ static int llex(LexState *ls, TValue *tv)
             }
           }
           /* else short comment */
-          while (!currIsNewline(ls) && ls->current != END_OF_STREAM);
+          while (!currIsNewline(ls) && ls->current != END_OF_STREAM)
+            next(ls);
         }
         break;
       }
