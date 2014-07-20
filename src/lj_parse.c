@@ -2454,7 +2454,7 @@ static int parse_indent_block(LexState *ls, int indent)
   return islast;
 }
 
-/* Parse a single block. */
+/* Parse a single line block. */
 static int parse_single_block(LexState *ls)
 {
   int line = ls->linenumber;
@@ -2645,10 +2645,10 @@ static void parse_for_iter(LexState *ls, GCstr *indexname, int indent)
     lj_lex_next(ls);
     if (parse_indent_block(ls, indent))
       lex_match(ls, TK_end, TK_for, line);
-   } else if (ls->token == ';') {
+  } else if (ls->token == ';') {
     lj_lex_next(ls);
     parse_single_block(ls);
- } else {
+  } else {
     lex_check(ls, TK_do);
     parse_block(ls);
     lex_match(ls, TK_end, TK_for, line);
