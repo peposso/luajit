@@ -1894,7 +1894,7 @@ static void parse_body(LexState *ls, ExpDesc *e, int needself, BCLine line, int 
       pfs->flags |= PROTO_FIXUP_RETURN;
     pfs->flags |= PROTO_CHILD;
   }
-  lj_lex_next(ls);
+  if (islast) lj_lex_next(ls);
 }
 
 /* Parse expression list. Last expression is left open. */
@@ -2775,8 +2775,10 @@ static int parse_chunk(LexState *ls, int indent)
          ls->fs->freereg >= ls->fs->nactvar);
     ls->fs->freereg = ls->fs->nactvar;  /* Free registers after each stmt. */
   }
+  islast = 0;
   if (isindent == 1 && ls->indent > indent) islast = 1;
-  else if (isindent == 2 && ls->linenumber == line) islast = 1;
+  if (isindent == 2 && ls->linenumber == line) islast = 1;
+  if (isindent == 0) islast = 1;
   synlevel_end(ls);
   return islast;
 }
