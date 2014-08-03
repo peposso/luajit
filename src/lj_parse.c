@@ -2229,13 +2229,13 @@ static void parse_assignment(LexState *ls, LHSVarList *lh, BCReg nvars)
     nexps = expr_list(ls, &e);
     if (nexps == nvars) {
       if (e.k == VCALL) {
-	if (bc_op(*bcptr(ls->fs, &e)) == BC_VARG) {  /* Vararg assignment. */
-	  ls->fs->freereg--;
-	  e.k = VRELOCABLE;
-	} else {  /* Multiple call results. */
-	  e.u.s.info = e.u.s.aux;  /* Base of call is not relocatable. */
-	  e.k = VNONRELOC;
-	}
+        if (bc_op(*bcptr(ls->fs, &e)) == BC_VARG) {  /* Vararg assignment. */
+          ls->fs->freereg--;
+          e.k = VRELOCABLE;
+        } else {  /* Multiple call results. */
+          e.u.s.info = e.u.s.aux;  /* Base of call is not relocatable. */
+          e.k = VNONRELOC;
+        }
       }
       bcemit_store(ls->fs, &lh->v, &e);
       return;
@@ -2249,6 +2249,24 @@ static void parse_assignment(LexState *ls, LHSVarList *lh, BCReg nvars)
   bcemit_store(ls->fs, &lh->v, &e);
 }
 
+/* parse compound assignment statement. */
+static void parse_compound_assignment(LexState *ls, LHSVarList *lh, BinOpr op)
+{
+  checkcond(ls, VLOCAL <= lh->v.k && lh->v.k <= VINDEXED, LJ_ERR_XSYNTAX);
+  /* Parse RHS. */
+  ExpDesc e1 = lh->v;  /* copy lhs expr */
+  ExpDesc e2;
+  lj_lex_next(ls); /* skip op */
+  synlevel_begin(ls);
+  bcemit_binop_left(ls->fs, op, &e1);
+  expr(ls, &e2);
+  bcemit_binop(ls->fs, op, &e1, &e2);
+  synlevel_end(ls);
+  assign_adjust(ls, 1, 1, &e1);
+  /* Assign RHS to LHS and recurse downwards. */
+  bcemit_store(ls->fs, &lh->v, &e1);
+}
+
 /* Parse call statement or assignment. */
 static void parse_call_assign(LexState *ls)
 {
@@ -2259,7 +2277,23 @@ static void parse_call_assign(LexState *ls)
     setbc_b(bcptr(fs, &vl.v), 1);  /* No results. */
   } else {  /* Start of an assignment. */
     vl.prev = NULL;
-    parse_assignment(ls, &vl, 1);
+    BinOpr op = OPR_NOBINOPR;
+    switch (ls->token) {
+    case TK_addassign: op = OPR_ADD; break;
+    case TK_subassign: op = OPR_SUB; break;
+    case TK_mulassign: op = OPR_MUL; break;
+    case TK_divassign: op = OPR_DIV; break;
+    case TK_modassign: op = OPR_MOD; break;
+    case TK_powassign: op = OPR_POW; break;
+    case TK_concatassign: op = OPR_CONCAT; break;
+    case TK_andassign: op = OPR_AND; break;
+    case TK_orassign: op = OPR_OR; break;
+    default: break;
+    }
+    if (op == OPR_NOBINOPR)
+      parse_assignment(ls, &vl, 1);
+    else
+      parse_compound_assignment(ls, &vl, op);
   }
 }
 

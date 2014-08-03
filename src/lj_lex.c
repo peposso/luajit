@@ -297,6 +297,14 @@ static int llex(LexState *ls, TValue *tv)
         int tk = TK_OFS + s->reserved;
         if (tk == TK_def) return TK_function;
         if (tk == TK_elif) return TK_elseif;
+        if (tk == TK_and && ls->current == '=') {
+          next(ls);
+          return TK_andassign;
+        }
+        if (tk == TK_or && ls->current == '=') {
+          next(ls);
+          return TK_orassign;
+        }
         return tk;
       }
       return TK_name;
@@ -315,6 +323,10 @@ static int llex(LexState *ls, TValue *tv)
       continue;
     case '-':
       next(ls);
+      if (ls->current == '=') {
+        next(ls);
+        return TK_subassign;
+      }
       if (ls->current != '-') return '-';
       /* else is a comment */
       next(ls);
@@ -409,6 +421,9 @@ static int llex(LexState *ls, TValue *tv)
         if (ls->current == '.') {
           next(ls);
           return TK_dots;   /* ... */
+        } else if (ls->current == '=') {
+          next(ls);
+          return TK_concatassign;   /* ..= */
         }
         return TK_concat;   /* .. */
       } else if (!lj_char_isdigit(ls->current)) {
@@ -417,6 +432,41 @@ static int llex(LexState *ls, TValue *tv)
         lex_number(ls, tv);
         return TK_number;
       }
+    case '+':
+      next(ls);
+      if (ls->current == '=') {
+        next(ls);
+        return TK_addassign;
+      }
+      return '+';
+    case '*':
+      next(ls);
+      if (ls->current == '=') {
+        next(ls);
+        return TK_mulassign;
+      }
+      return '*';
+    case '/':
+      next(ls);
+      if (ls->current == '=') {
+        next(ls);
+        return TK_divassign;
+      }
+      return '/';
+    case '%':
+      next(ls);
+      if (ls->current == '=') {
+        next(ls);
+        return TK_modassign;
+      }
+      return '%';
+    case '^':
+      next(ls);
+      if (ls->current == '=') {
+        next(ls);
+        return TK_powassign;
+      }
+      return '^';
     case END_OF_STREAM:
       return TK_eof;
     default: {

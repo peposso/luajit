@@ -19,6 +19,9 @@
   _(def) _(elif) \
   _(while) \
   __(concat, ..) __(dots, ...) __(eq, ==) __(ge, >=) __(le, <=) __(ne, ~=) \
+  __(addassign, +=) __(subassign, -=) __(mulassign, *=) __(divassign, /=) \
+  __(modassign, %=) __(powassign, ^=) __(concatassign, ..=) \
+  __(andassign, and=) __(orassign, or=) \
   __(label, ::) \
   __(indentblock, :<nl>) \
   __(number, <number>) __(name, <name>) __(string, <string>) \

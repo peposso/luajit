@@ -148,6 +148,7 @@ clean:
 	$(MAKE) -C src clean
 
 test:
+	$(INSTALL_DEP) test/compassign.lua
 	$(INSTALL_DEP) test/indent_func.lua
 	$(INSTALL_DEP) test/indent_if.lua
 	$(INSTALL_DEP) test/indent_for.lua
