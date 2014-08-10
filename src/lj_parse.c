@@ -1748,37 +1748,44 @@ static void expr_table(LexState *ls, ExpDesc *e)
       if (!expr_isk(&key)) expr_index(fs, e, &key);
       if (expr_isnumk(&key) && expr_numiszero(&key)) needarr = 1; else nhash++;
       lex_check(ls, '=');
+      expr(ls, &val);
     } else if ((ls->token == TK_name || (!LJ_52 && ls->token == TK_goto)) &&
-	       lj_lex_lookahead(ls) == '=') {
+               lj_lex_lookahead(ls) == '=') {
       expr_str(ls, &key);
       lex_check(ls, '=');
+      nhash++;
+      expr(ls, &val);
+    } else if (ls->token == '=' && lj_lex_lookahead(ls) == TK_name) {
+      lex_check(ls, '=');
+      expr_str(ls, &key);
+      var_lookup_((ls)->fs, key.u.sval, &val, 1);
       nhash++;
     } else {
       expr_init(&key, VKNUM, 0);
       setintV(&key.u.nval, (int)narr);
       narr++;
       needarr = vcall = 1;
+      expr(ls, &val);
     }
-    expr(ls, &val);
     if (expr_isk(&key) && key.k != VKNIL &&
-	(key.k == VKSTR || expr_isk_nojump(&val))) {
+        (key.k == VKSTR || expr_isk_nojump(&val))) {
       TValue k, *v;
       if (!t) {  /* Create template table on demand. */
-	BCReg kidx;
-	t = lj_tab_new(fs->L, needarr ? narr : 0, hsize2hbits(nhash));
-	kidx = const_gc(fs, obj2gco(t), LJ_TTAB);
-	fs->bcbase[pc].ins = BCINS_AD(BC_TDUP, freg-1, kidx);
+        BCReg kidx;
+        t = lj_tab_new(fs->L, needarr ? narr : 0, hsize2hbits(nhash));
+        kidx = const_gc(fs, obj2gco(t), LJ_TTAB);
+        fs->bcbase[pc].ins = BCINS_AD(BC_TDUP, freg-1, kidx);
       }
       vcall = 0;
       expr_kvalue(&k, &key);
       v = lj_tab_set(fs->L, t, &k);
       lj_gc_anybarriert(fs->L, t);
       if (expr_isk_nojump(&val)) {  /* Add const key/value to template table. */
-	expr_kvalue(v, &val);
+        expr_kvalue(v, &val);
       } else {  /* Otherwise create dummy string key (avoids lj_tab_newkey). */
-	settabV(fs->L, v, t);  /* Preserve key with table itself as value. */
-	fixt = 1;   /* Fix this later, after all resizes. */
-	goto nonconst;
+        settabV(fs->L, v, t);  /* Preserve key with table itself as value. */
+        fixt = 1;   /* Fix this later, after all resizes. */
+        goto nonconst;
       }
     } else {
     nonconst:
@@ -1794,7 +1801,7 @@ static void expr_table(LexState *ls, ExpDesc *e)
     BCInsLine *ilp = &fs->bcbase[fs->pc-1];
     ExpDesc en;
     lua_assert(bc_a(ilp->ins) == freg &&
-	       bc_op(ilp->ins) == (narr > 256 ? BC_TSETV : BC_TSETB));
+               bc_op(ilp->ins) == (narr > 256 ? BC_TSETV : BC_TSETB));
     expr_init(&en, VKNUM, 0);
     en.u.nval.u32.lo = narr-1;
     en.u.nval.u32.hi = 0x43300000;  /* Biased integer to avoid denormals. */
@@ -1822,11 +1829,11 @@ static void expr_table(LexState *ls, ExpDesc *e)
       Node *node = noderef(t->node);
       uint32_t i, hmask = t->hmask;
       for (i = 0; i <= hmask; i++) {
-	Node *n = &node[i];
-	if (tvistab(&n->val)) {
-	  lua_assert(tabV(&n->val) == t);
-	  setnilV(&n->val);  /* Turn value into nil. */
-	}
+        Node *n = &node[i];
+        if (tvistab(&n->val)) {
+          lua_assert(tabV(&n->val) == t);
+          setnilV(&n->val);  /* Turn value into nil. */
+        }
       }
     }
     lj_gc_check(fs->L);
@@ -2381,22 +2388,22 @@ static void parse_return(LexState *ls)
     BCReg nret = expr_list(ls, &e);
     if (nret == 1) {  /* Return one result. */
       if (e.k == VCALL) {  /* Check for tail call. */
-	BCIns *ip = bcptr(fs, &e);
-	/* It doesn't pay off to add BC_VARGT just for 'return ...'. */
-	if (bc_op(*ip) == BC_VARG) goto notailcall;
-	fs->pc--;
-	ins = BCINS_AD(bc_op(*ip)-BC_CALL+BC_CALLT, bc_a(*ip), bc_c(*ip));
+        BCIns *ip = bcptr(fs, &e);
+        /* It doesn't pay off to add BC_VARGT just for 'return ...'. */
+        if (bc_op(*ip) == BC_VARG) goto notailcall;
+        fs->pc--;
+        ins = BCINS_AD(bc_op(*ip)-BC_CALL+BC_CALLT, bc_a(*ip), bc_c(*ip));
       } else {  /* Can return the result from any register. */
-	ins = BCINS_AD(BC_RET1, expr_toanyreg(fs, &e), 2);
+        ins = BCINS_AD(BC_RET1, expr_toanyreg(fs, &e), 2);
       }
     } else {
       if (e.k == VCALL) {  /* Append all results from a call. */
       notailcall:
-	setbc_b(bcptr(fs, &e), 0);
-	ins = BCINS_AD(BC_RETM, fs->nactvar, e.u.s.aux - fs->nactvar);
+        setbc_b(bcptr(fs, &e), 0);
+        ins = BCINS_AD(BC_RETM, fs->nactvar, e.u.s.aux - fs->nactvar);
       } else {
-	expr_tonextreg(fs, &e);  /* Force contiguous registers. */
-	ins = BCINS_AD(BC_RET, fs->nactvar, nret+1);
+        expr_tonextreg(fs, &e);  /* Force contiguous registers. */
+        ins = BCINS_AD(BC_RET, fs->nactvar, nret+1);
       }
     }
   }
