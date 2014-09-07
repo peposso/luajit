@@ -148,14 +148,15 @@ clean:
 	$(MAKE) -C src clean
 
 test:
-	$(INSTALL_DEP) test/shorthand_key.lua
-	$(INSTALL_DEP) test/compassign.lua
-	$(INSTALL_DEP) test/indent_func.lua
-	$(INSTALL_DEP) test/indent_if.lua
-	$(INSTALL_DEP) test/indent_for.lua
-	$(INSTALL_DEP) test/indent_while.lua
-	$(INSTALL_DEP) test/def.lua
-	$(INSTALL_DEP) test/elif.lua
+	$(INSTALL_DEP) test/autolocal.lua
+	# $(INSTALL_DEP) test/shorthand_key.lua
+	# $(INSTALL_DEP) test/compassign.lua
+	# $(INSTALL_DEP) test/indent_func.lua
+	# $(INSTALL_DEP) test/indent_if.lua
+	# $(INSTALL_DEP) test/indent_for.lua
+	# $(INSTALL_DEP) test/indent_while.lua
+	# $(INSTALL_DEP) test/def.lua
+	# $(INSTALL_DEP) test/elif.lua
 
 .PHONY: all install amalg clean test
 

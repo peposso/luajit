@@ -2218,7 +2218,7 @@ static void assign_adjust(LexState *ls, BCReg nvars, BCReg nexps, ExpDesc *e)
 }
 
 /* Recursively parse assignment statement. */
-static void parse_assignment(LexState *ls, LHSVarList *lh, BCReg nvars)
+static void parse_assignment(LexState *ls, LHSVarList *lh, BCReg nvars, BCReg *new_vars)
 {
   ExpDesc e;
   checkcond(ls, VLOCAL <= lh->v.k && lh->v.k <= VINDEXED, LJ_ERR_XSYNTAX);
@@ -2226,13 +2226,22 @@ static void parse_assignment(LexState *ls, LHSVarList *lh, BCReg nvars)
     LHSVarList vl;
     vl.prev = lh;
     expr_primary(ls, &vl.v);
+    if (vl.v.k == VGLOBAL) {
+      BCReg reg = ls->fs->nactvar + *new_vars;
+      var_new(ls, *new_vars, vl.v.u.sval);
+      expr_init(&vl.v, VLOCAL, reg);
+      vl.v.u.s.aux = ls->fs->varmap[reg];
+      fscope_uvmark(ls->fs, reg);
+      ++(*new_vars);
+    }
     if (vl.v.k == VLOCAL)
       assign_hazard(ls, lh, &vl.v);
     checklimit(ls->fs, ls->level + nvars, LJ_MAX_XLEVEL, "variable names");
-    parse_assignment(ls, &vl, nvars+1);
+    parse_assignment(ls, &vl, nvars+1, new_vars);
   } else {  /* Parse RHS. */
     BCReg nexps;
     lex_check(ls, '=');
+    ls->fs->freereg += *new_vars;
     nexps = expr_list(ls, &e);
     if (nexps == nvars) {
       if (e.k == VCALL) {
@@ -2283,6 +2292,16 @@ static void parse_call_assign(LexState *ls)
   if (vl.v.k == VCALL) {  /* Function call statement. */
     setbc_b(bcptr(fs, &vl.v), 1);  /* No results. */
   } else {  /* Start of an assignment. */
+    BCReg new_vars = 0;
+    if (vl.v.k == VGLOBAL) {
+      /* assignment to unknown variable */
+      BCReg reg = ls->fs->nactvar;
+      var_new(ls, 0, vl.v.u.sval);
+      expr_init(&vl.v, VLOCAL, reg);
+      vl.v.u.s.aux = ls->fs->varmap[reg];
+      fscope_uvmark(ls->fs, reg);
+      new_vars = 1;
+    }
     vl.prev = NULL;
     BinOpr op = OPR_NOBINOPR;
     switch (ls->token) {
@@ -2297,8 +2316,12 @@ static void parse_call_assign(LexState *ls)
     case TK_orassign: op = OPR_OR; break;
     default: break;
     }
-    if (op == OPR_NOBINOPR)
-      parse_assignment(ls, &vl, 1);
+    if (op == OPR_NOBINOPR) {
+      parse_assignment(ls, &vl, 1, &new_vars);
+      if (new_vars > 0) {
+        var_add(ls, new_vars);
+      }
+    }
     else
       parse_compound_assignment(ls, &vl, op);
   }
